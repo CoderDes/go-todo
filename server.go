@@ -2,41 +2,62 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 	"net/http"
+	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 const databaseURI = "mongodb://localhost:27017"
-const delayInSec  = 10 * time.Second
+const delayInSec = 10 * time.Second
 const serverPort = ":8080"
 
+type User struct {
+	Email    string `json: "email"`
+	Password string `json: "password"`
+}
 
 func loginHandler(rewWr http.ResponseWriter, req *http.Request) {
-	fmt.Println("LOGIN monREQUEST IS ", req)
+	fmt.Println("LOGIN REQUEST IS ", req)
 }
 
 func registerHandler(resWr http.ResponseWriter, req *http.Request) {
-	fmt.Println("REGISTER REQUEST IS ", req)
 	if req.Method != "POST" {
 		http.Error(resWr, "Method is not supported", http.StatusNotFound)
 		return
 	}
-}	
+	// TODO: check Content-type header for application/json
 
-func main() {
+	user := User{}
+
+	decoder := json.NewDecoder(req.Body)
+	decoder.DisallowUnknownFields()
+
+	err := decoder.Decode(&user)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// TODO: hash the password and write user to DB
+
+	fmt.Println("USER", user)
+}
+
+func getDBConnection() (client *mongo.Client) {
 	client, err := mongo.NewClient(options.Client().ApplyURI(databaseURI))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// what for this
 	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
+
 	err = client.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -52,10 +73,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(databases)
+	fmt.Println("Connected to DB")
+	fmt.Println("dbs:", databases)
 
-	defer client.Disconnect(ctx)
+	return client
+}
 
+func main() {
+	var dbClient = getDBConnection()
+	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
+	defer dbClient.Disconnect(ctx)
 
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/register", registerHandler)
