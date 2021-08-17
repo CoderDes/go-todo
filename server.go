@@ -1,26 +1,37 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	
+	"golang.org/x/crypto/bcrypt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go-todo/database"
 )
 
-const databaseURI = "mongodb://localhost:27017"
-const delayInSec = 10 * time.Second
 const serverPort = ":8080"
+const hashSalt = 15
 
-type User struct {
+type UserFromJSON struct {
 	Email    string `json: "email"`
 	Password string `json: "password"`
+}
+
+type RegisterResponse struct {
+	StatusCode int
+	CreatedUserId string
+}
+
+func hashPassword(password string) (string) {
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), hashSalt)
+	if err != nil {
+		fmt.Println("Hashing password is failed")
+		log.Fatal(err)
+	}
+	return string(hashBytes)
 }
 
 func loginHandler(rewWr http.ResponseWriter, req *http.Request) {
@@ -34,7 +45,7 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 	}
 	// TODO: check Content-type header for application/json
 
-	user := User{}
+	user := UserFromJSON{}
 
 	decoder := json.NewDecoder(req.Body)
 	decoder.DisallowUnknownFields()
@@ -44,49 +55,38 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 		log.Fatal(err)
 	}
 
-	// TODO: hash the password and write user to DB
+	hashedPassword := hashPassword(user.Password)
 
-	fmt.Println("USER", user)
-}
+	newUser := db.UserToDB {
+		Email: user.Email,
+		PasswordHash: hashedPassword,
+	}
 
-func getDBConnection() (client *mongo.Client) {
-	client, err := mongo.NewClient(options.Client().ApplyURI(databaseURI))
+	// TODO: register only users with unique email
+	saveResult := db.SaveUserToDB(newUser)
+	userId := saveResult.InsertedID.(primitive.ObjectID).Hex()
+
+	responseData := RegisterResponse{
+		StatusCode: http.StatusCreated,
+		CreatedUserId: userId,
+	}
+
+	jsonResponseData, err := json.Marshal(responseData);
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// what for this
-	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
-
-	err = client.Connect(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = client.Ping(ctx, readpref.Primary())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	databases, err := client.ListDatabaseNames(ctx, bson.M{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Connected to DB")
-	fmt.Println("dbs:", databases)
-
-	return client
+	resWr.Header().Set("Content-Type", "application/json")
+	resWr.WriteHeader(http.StatusCreated)
+	resWr.Write(jsonResponseData)
 }
 
 func main() {
-	var dbClient = getDBConnection()
-	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
-	defer dbClient.Disconnect(ctx)
 
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/register", registerHandler)
 
+	// TODO: log somehow that server start listening
 	if err := http.ListenAndServe(serverPort, nil); err != nil {
 		log.Fatal(err)
 	}
