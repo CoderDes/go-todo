@@ -5,27 +5,23 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	
-	"golang.org/x/crypto/bcrypt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
+
+	usrConst "go-todo/constants/user"
 	"go-todo/database"
 )
 
 const serverPort = ":8080"
 const hashSalt = 15
 
-type UserFromJSON struct {
-	Email    string `json: "email"`
-	Password string `json: "password"`
-}
-
 type RegisterResponse struct {
-	StatusCode int
+	StatusCode    int
 	CreatedUserId string
 }
 
-func hashPassword(password string) (string) {
+func hashPassword(password string) string {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), hashSalt)
 	if err != nil {
 		fmt.Println("Hashing password is failed")
@@ -45,7 +41,7 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 	}
 	// TODO: check Content-type header for application/json
 
-	user := UserFromJSON{}
+	user := usrConst.UserFromJSON{}
 
 	decoder := json.NewDecoder(req.Body)
 	decoder.DisallowUnknownFields()
@@ -57,8 +53,8 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 
 	hashedPassword := hashPassword(user.Password)
 
-	newUser := db.UserToDB {
-		Email: user.Email,
+	newUser := usrConst.UserToDB{
+		Email:        user.Email,
 		PasswordHash: hashedPassword,
 	}
 
@@ -67,11 +63,11 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 	userId := saveResult.InsertedID.(primitive.ObjectID).Hex()
 
 	responseData := RegisterResponse{
-		StatusCode: http.StatusCreated,
+		StatusCode:    http.StatusCreated,
 		CreatedUserId: userId,
 	}
 
-	jsonResponseData, err := json.Marshal(responseData);
+	jsonResponseData, err := json.Marshal(responseData)
 	if err != nil {
 		log.Fatal(err)
 	}

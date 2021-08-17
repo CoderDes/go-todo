@@ -1,32 +1,26 @@
 package db
 
 import (
-	"fmt"
 	"context"
-	"time"
+	"fmt"
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+
+	dbConst "go-todo/constants/db"
+	usrConst "go-todo/constants/user"
 )
 
-const databaseURI = "mongodb://localhost:27017"
-const delayInSec = 10 * time.Second
-
-type UserToDB struct {
-	Email string
-	PasswordHash string
-}
-
 func getDBClient() (client *mongo.Client) {
-	client, err := mongo.NewClient(options.Client().ApplyURI(databaseURI))
+	client, err := mongo.NewClient(options.Client().ApplyURI(dbConst.DatabaseURI))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
+	ctx, _ := context.WithTimeout(context.Background(), dbConst.DelayInSec)
 
 	err = client.Connect(ctx)
 	if err != nil {
@@ -43,17 +37,13 @@ func getDBClient() (client *mongo.Client) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Connected to MongoDB")
-	fmt.Println("Available dbs:", databases)
-
 	return client
 }
 
-func SaveUserToDB(user UserToDB) (*mongo.InsertOneResult){
+func SaveUserToDB(user usrConst.UserToDB) *mongo.InsertOneResult {
 	var client = getDBClient()
-	ctx, _ := context.WithTimeout(context.Background(), delayInSec)
+	ctx, _ := context.WithTimeout(context.Background(), dbConst.DelayInSec)
 	defer client.Disconnect(ctx)
-
 
 	todoDatabase := client.Database("todo")
 	usersCollection := todoDatabase.Collection("users")
@@ -68,8 +58,5 @@ func SaveUserToDB(user UserToDB) (*mongo.InsertOneResult){
 		log.Fatal(err)
 	}
 
-
-	// fmt.Println("SAVED USER RESULT", reflect.TypeOf(userSaveResult))
 	return userSaveResult
-
 }
