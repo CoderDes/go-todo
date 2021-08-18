@@ -9,8 +9,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 
+	errConst "go-todo/constants/errors"
 	usrConst "go-todo/constants/user"
 	"go-todo/database"
+	"go-todo/util"
 )
 
 const serverPort = ":8080"
@@ -36,10 +38,25 @@ func loginHandler(rewWr http.ResponseWriter, req *http.Request) {
 
 func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
-		http.Error(resWr, "Method is not supported", http.StatusNotFound)
+		util.ErrorHandler(errConst.ErrorHandlerOptions{
+			RespWr: resWr,
+			Payload: errConst.ErrorResponseMessage{
+				StatusCode: http.StatusBadRequest,
+				ErrorMsg:   "Method is not supported",
+			},
+		})
 		return
 	}
-	// TODO: check Content-type header for application/json
+	if req.Header.Get("Content-Type") != "application/json" {
+		util.ErrorHandler(errConst.ErrorHandlerOptions{
+			RespWr: resWr,
+			Payload: errConst.ErrorResponseMessage{
+				StatusCode: http.StatusBadRequest,
+				ErrorMsg:   "Request payload must be in JSON format",
+			},
+		})
+		return 
+	}
 
 	user := usrConst.UserFromJSON{}
 
