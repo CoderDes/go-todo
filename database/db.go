@@ -35,6 +35,32 @@ func getDBClient() (client *mongo.Client) {
 	return client
 }
 
+func UserAlreadyExists(email string) (exists bool) {
+	_, err := getUserByEmail(email)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func getUserByEmail(email string) (userFromDB usrConst.UserToDB, err error) {
+	var client = getDBClient()
+	ctx, _ := context.WithTimeout(context.Background(), dbConst.DelayInSec)
+	defer client.Disconnect(ctx)
+
+	todoDatabase := client.Database("todo")
+	usersCollection := todoDatabase.Collection("users")
+
+	var user usrConst.UserToDB
+	
+	filter := bson.M{"email": email}
+	cursor := usersCollection.FindOne(ctx, filter)
+	err = cursor.Decode(&user)
+	
+	return user, err
+}
+
 func SaveUserToDB(user usrConst.UserToDB) *mongo.InsertOneResult {
 	var client = getDBClient()
 	ctx, _ := context.WithTimeout(context.Background(), dbConst.DelayInSec)

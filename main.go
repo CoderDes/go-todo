@@ -75,7 +75,17 @@ func registerHandler(resWr http.ResponseWriter, req *http.Request) {
 		PasswordHash: hashedPassword,
 	}
 
-	// TODO: register only users with unique email
+	if db.UserAlreadyExists(newUser.Email) == true {
+		util.ErrorHandler(errConst.ErrorHandlerOptions{
+			RespWr: resWr,
+			Payload: errConst.ErrorResponseMessage{
+				StatusCode: http.StatusBadRequest,
+				ErrorMsg:   "User with such email already exists",
+			},
+		})
+		return 
+	}
+
 	saveResult := db.SaveUserToDB(newUser)
 	userId := saveResult.InsertedID.(primitive.ObjectID).Hex()
 
